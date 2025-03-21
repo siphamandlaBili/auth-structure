@@ -25,4 +25,30 @@ export const sendVerificationEmail = async (userEmail,verificationToken)=>{
     }
 }
 
+export const sendWelcomeEmail = async (email, name) => {
+  const recipient = [
+    {
+      email: email,
+    },
+  ];
 
+  try {
+    const response = await client.send({
+      from: sender,
+      to: recipient,
+      template_uuid: "70dd55d9-48c5-40b2-bc86-6ae71afb1b53",
+      template_variables: {
+        company_info_name: "Psycad UJ",
+        name: name,
+        company_info_address: "UJ APB Company",
+        company_info_city: "Johannesburg",
+        company_info_zip_code: "2058",
+        company_info_country: "South Africa",
+      },
+    });
+    console.log("Welcome email sent successfully"+ response);
+  } catch (error) {
+    console.error("Error sending email:", error.message);
+    throw new Error("Error sending email");
+  }
+};
