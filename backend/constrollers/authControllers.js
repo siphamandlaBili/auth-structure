@@ -1,7 +1,10 @@
 import { User } from "../models/UserModel.js";
-import bcrypt from "bcryptjs";
 import { generateTokenAndSetCookie } from "../util/generateAndSetCookie.js"
-import { sendVerificationEmail ,sendWelcomeEmail} from "../mailtrap/emails.js";
+import { forgotPasswordSend, sendVerificationEmail ,sendWelcomeEmail} from "../mailtrap/emails.js";
+import bcrypt from "bcryptjs";
+import crypto from 'crypto';
+import dotenv from "dotenv";
+dotenv.config();
 
 export const signup = async (req, res) => {
 
@@ -56,7 +59,7 @@ export const verifyEmail = async (req, res) => {
       verificationToken: code, 
       verificationTokenExpiresAt: {$gt:Date.now()}
      });
-     
+
       if(!user) {
         return res.status(400).json({
           success: false,
@@ -85,11 +88,67 @@ export const verifyEmail = async (req, res) => {
   }
 
 }
+
 export const logout = (req, res) => {
-  console.log(req.url)
+  const token = req.cookies.token
+  console.log(token)
+  if(token){
+    res.clearCookie("token");
+    res.status(200).json({success:true,message:"logged out successfully"});
+  } else{
+    res.status(200).json({success:true,message:"already logged out"});
+  }
+  
 }
 
-export const login = (req, res) => {
-  console.log(req.url)
+export const login = async (req, res) => {
+  const {email,password} = req.body;
+  try {
+    const user = await User.findOne({email})
+
+    if(!user){
+      res.status(400).json({success: false,message:"user credentials invalid"})
+    }
+    const isPasswordValid = await bcrypt.compare(password,user.password);
+    if(!isPasswordValid){
+      res.status(400).json({success: false,message:"user credentials invalid"})
+    }
+
+    if(user && isPasswordValid){
+      generateTokenAndSetCookie(res,user.id);
+      user.lastLogin = new Date();
+      user.save();
+       res.status(200).json({success:true,message:`welcome ${user.name}`,user})
+    }
+  } catch (error) {
+    res.status(400).json({success:false,message:error.error.message})
+  }
 }
 
+export const forgotPassword = async (req,res)=>{
+   const {email} = req.body;
+   try {
+     const user = await User.findOne({email});
+     
+
+    if(!user){
+      return res.status(400).json({success:false,message:"user doesnt exist"});
+    } else{
+      const resetToken = crypto.randomBytes(20).toString("hex");
+      const resetTokenExpiresAt = Date.now() + 1 * 60 *60 *1000;
+
+      user.resetPasswordExpiresAt = resetTokenExpiresAt;
+      user.resetPasswordToken = resetToken;
+
+      await user.save();
+
+      const link = `${process.env.CLIENT_URL}/api/auth/forgot-password/${resetToken}`
+      await forgotPasswordSend(email,link);
+      return res.status(200).json({success:true,message:`reset password link has been sent to ${email}`});
+    }
+
+
+   } catch (error) {
+    return res.status(400).json({success:false,message:error.message});
+   }
+}
