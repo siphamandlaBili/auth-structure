@@ -175,3 +175,17 @@ console.log(token,password)
     
   }
 }
+
+export const verifyAuth = async (req,res) =>{
+ 
+ try {
+  const user = await User.findById(req.userId).select("-password");
+
+ if(!user){
+  return res.status(400).json({success:false,message:"user not verified"})
+ }
+ res.status(200).json({success:true,message:"user verified"})
+ } catch (error) {
+  res.status(400).json({success:false,message:error.message})
+ }
+}
